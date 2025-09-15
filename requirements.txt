@@ -1,2 +1,6 @@
 matplotlib
 seaborn
+openpyxl
+sklearn
+statsmodels
+scikit-learn

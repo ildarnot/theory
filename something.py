@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Загрузка данных из Excel
-df = pd.read_excel('your_data.xlsx')  # Изменили на read_excel
+df = pd.read_excel('results.xlsx')  # Изменили на read_excel
 
 # 1. Посмотреть на первые строки
 print("Первые 5 строк данных:")
