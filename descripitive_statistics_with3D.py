@@ -6,7 +6,13 @@ from sklearn.linear_model import LinearRegression
 from mpl_toolkits.mplot3d import Axes3D
 
 # Загрузите данные из Excel
-df = pd.read_excel('another_results.xlsx')  # Замените 'your_file.xlsx' на путь к вашему файлу
+df = pd.read_excel('another_results.xlsx')
+
+# Убедимся, что числовые данные правильно преобразованы (запятые в точки)
+numeric_columns = ['curing_time', 'surface_energy', 'roughness', 'break_force']
+for col in numeric_columns:
+    if df[col].dtype == 'object':  # Если данные строковые (из-за запятых)
+        df[col] = df[col].str.replace(',', '.').astype(float)
 
 # Посмотрим на данные
 print("Первые 5 строк данных:")
@@ -30,7 +36,7 @@ plt.title('Тепловая карта корреляций')
 plt.show()
 
 # Разделяем признаки и целевую переменную
-X = df[['surface_energy', 'roughness']]
+X = df[['curing_time', 'surface_energy', 'roughness']]  # Добавили curing_time
 y = df['break_force']
 
 # Создаем модель линейной регрессии
@@ -41,25 +47,32 @@ model.fit(X, y)
 
 # Получаем веса и смещение
 print("\nРезультаты регрессии:")
-print("Коэффициенты (w1, w2):", model.coef_)
+print("Коэффициенты (curing_time, surface_energy, roughness):", model.coef_)
 print("Смещение (b):", model.intercept_)
 print(f'''
 Наша предсказательная формула может быть представлена как:
-break_force = {model.intercept_} + {model.coef_[0]}'surface_energy' +{model.coef_[1]}'roughness' ''')
+break_force = {model.intercept_} + {model.coef_[0]}*curing_time + {model.coef_[1]}*surface_energy + {model.coef_[2]}*roughness ''')
 
 # Предсказание
 y_pred = model.predict(X)
 print("\nПредсказанные значения y (break_force):", y_pred)
 
-# Создаем сетку для построения плоскости регрессии
+# Для 3D визуализации выберем два наиболее значимых признака
+# Создаем сетку для построения поверхности регрессии
+# Выберем два признака для визуализации (например, curing_time и surface_energy)
 x_surf, y_surf = np.meshgrid(
-    np.linspace(X['surface_energy'].min(), X['surface_energy'].max(), 20),
-    np.linspace(X['roughness'].min(), X['roughness'].max(), 20)
+    np.linspace(X['curing_time'].min(), X['curing_time'].max(), 20),
+    np.linspace(X['surface_energy'].min(), X['surface_energy'].max(), 20)
 )
+
+# Для третьего признака используем среднее значение
+roughness_mean = X['roughness'].mean()
 grid_points = pd.DataFrame({
-    'surface_energy': x_surf.ravel(),
-    'roughness': y_surf.ravel()
+    'curing_time': x_surf.ravel(),
+    'surface_energy': y_surf.ravel(),
+    'roughness': roughness_mean  # Фиксируем roughness на среднем уровне
 })
+
 z_pred = model.predict(grid_points).reshape(x_surf.shape)
 
 # Создаем 3D график
@@ -68,8 +81,8 @@ ax = fig.add_subplot(111, projection='3d')
 
 # Отображаем исходные данные
 ax.scatter(
+    X['curing_time'], 
     X['surface_energy'], 
-    X['roughness'], 
     y, 
     c='blue', 
     marker='o', 
@@ -77,10 +90,10 @@ ax.scatter(
     label='Фактические данные'
 )
 
-# Отображаем предсказания модели
+# Отображаем предсказания модели (только для фиксированного значения roughness)
 ax.scatter(
+    X['curing_time'], 
     X['surface_energy'], 
-    X['roughness'], 
     y_pred, 
     c='red', 
     marker='^', 
@@ -88,21 +101,24 @@ ax.scatter(
     label='Предсказания'
 )
 
-# Отображаем плоскость регрессии
-ax.plot_surface(
+# Отображаем поверхность регрессии
+surf = ax.plot_surface(
     x_surf, 
     y_surf, 
     z_pred, 
-    color='green', 
-    alpha=0.3,
-    label='Плоскость регрессии'
+    cmap='viridis',
+    alpha=0.6,
+    label='Поверхность регрессии'
 )
 
+# Добавляем цветовую шкалу
+fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
+
 # Настраиваем график
-ax.set_xlabel('Surface Energy')
-ax.set_ylabel('Roughness')
+ax.set_xlabel('Curing Time')
+ax.set_ylabel('Surface Energy')
 ax.set_zlabel('Break Force')
-ax.set_title('Линейная регрессия: Зависимость Break Force от Surface Energy и Roughness')
+ax.set_title('Регрессия: Break Force от Curing Time, Surface Energy и Roughness\n(Roughness зафиксирован на среднем уровне)')
 ax.legend()
 
 plt.show()
@@ -138,3 +154,13 @@ mse = mean_squared_error(y, y_pred)
 print(f"\nОценка качества модели:")
 print(f"R² (коэффициент детерминации): {r2:.4f}")
 print(f"MSE (среднеквадратичная ошибка): {mse:.4f}")
+
+# Дополнительный анализ: важность признаков
+feature_importance = pd.DataFrame({
+    'Признак': X.columns,
+    'Коэффициент': model.coef_,
+    'Абсолютное значение': np.abs(model.coef_)
+}).sort_values('Абсолютное значение', ascending=False)
+
+print("\nВажность признаков (по абсолютному значению коэффициента):")
+print(feature_importance)
